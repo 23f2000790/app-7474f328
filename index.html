@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/tailwindcss-jit-cdn"></script>
+</head>
+<body class="bg-slate-950 min-h-screen font-inter text-gray-100 p-4 antialiased">
+    <div class="max-w-3xl mx-auto py-8">
+        <h1 class="text-fuchsia-500 text-5xl font-extrabold text-center mb-8 drop-shadow-lg shadow-fuchsia-500/50">
+            NeonWallet
+        </h1>
+
+        <div class="mb-12 text-center">
+            <h2 class="text-xl font-semibold mb-2 text-gray-300">Total Balance</h2>
+            <p id="total-balance" class="text-7xl font-extrabold text-cyan-400 drop-shadow-lg shadow-cyan-400/50 transition-all duration-300 ease-in-out">
+                $0.00
+            </p>
+        </div>
+
+        <div class="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6 mb-8 shadow-lg shadow-fuchsia-500/20">
+            <h2 class="text-2xl font-bold mb-4 text-fuchsia-400">Add New Transaction</h2>
+            <form id="transaction-form" class="space-y-4">
+                <div>
+                    <label for="transaction-name" class="block text-sm font-medium text-gray-300 mb-1">Name</label>
+                    <input type="text" id="transaction-name" placeholder="Enter transaction name"
+                           class="w-full p-3 bg-slate-800 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 text-gray-100 placeholder-gray-500">
+                </div>
+                <div>
+                    <label for="transaction-amount" class="block text-sm font-medium text-gray-300 mb-1">Amount</label>
+                    <input type="number" id="transaction-amount" placeholder="Enter amount"
+                           class="w-full p-3 bg-slate-800 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 text-gray-100 placeholder-gray-500">
+                </div>
+                <div class="flex items-center space-x-4">
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="transaction-type" value="income" id="transaction-type-income" class="form-radio h-5 w-5 text-emerald-500 accent-emerald-500" checked>
+                        <span class="ml-2 text-gray-200">Income</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" name="transaction-type" value="expense" id="transaction-type-expense" class="form-radio h-5 w-5 text-rose-500 accent-rose-500">
+                        <span class="ml-2 text-gray-200">Expense</span>
+                    </label>
+                </div>
+                <button type="submit"
+                        class="w-full py-3 px-4 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold rounded-md transition duration-200 ease-in-out shadow-md shadow-fuchsia-500/50">
+                    Add Transaction
+                </button>
+            </form>
+        </div>
+
+        <div class="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6 mb-8 shadow-lg shadow-cyan-500/20">
+            <h2 class="text-2xl font-bold mb-4 text-cyan-400">Monthly Budget Used</h2>
+            <p id="budget-text" class="text-lg text-gray-300 mb-3">$0.00 / $2000.00</p>
+            <div class="w-full bg-slate-800 rounded-full h-4">
+                <div id="budget-progress-bar"
+                     class="bg-rose-500 h-4 rounded-full transition-all duration-500 ease-in-out"
+                     style="width: 0%;"></div>
+            </div>
+        </div>
+
+        <div class="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6 shadow-lg shadow-fuchsia-500/20">
+            <h2 class="text-2xl font-bold mb-4 text-fuchsia-400">Transactions History</h2>
+            <div id="transaction-list" class="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                <!-- Transactions will be dynamically added here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const totalBalanceEl = document.getElementById('total-balance');
+        const transactionForm = document.getElementById('transaction-form');
+        const transactionNameInput = document.getElementById('transaction-name');
+        const transactionAmountInput = document.getElementById('transaction-amount');
+        const transactionTypeIncome = document.getElementById('transaction-type-income');
+        const transactionTypeList = document.getElementById('transaction-list');
+        const budgetProgressBar = document.getElementById('budget-progress-bar');
+        const budgetTextEl = document.getElementById('budget-text');
+
+        const MONTHLY_BUDGET = 2000;
+        let transactions = [];
+
+        // Custom scrollbar style for Tailwind JIT
+        document.head.insertAdjacentHTML('beforeend', `
+            <style>
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: #1e293b; /* slate-800 */
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #a855f7; /* fuchsia-500 */
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #c084fc; /* fuchsia-400 */
+                }
+            </style>
+        `);
+
+
+        // Load transactions from LocalStorage
+        function loadTransactions() {
+            const storedTransactions = localStorage.getItem('neonWalletTransactions');
+            if (storedTransactions) {
+                transactions = JSON.parse(storedTransactions);
+            }
+        }
+
+        // Save transactions to LocalStorage
+        function saveTransactions() {
+            localStorage.setItem('neonWalletTransactions', JSON.stringify(transactions));
+        }
+
+        // Update total balance and monthly budget used
+        function updateBalanceAndBudget() {
+            let totalBalance = 0;
+            let monthlyBudgetUsed = 0;
+
+            transactions.forEach(transaction => {
+                const amount = parseFloat(transaction.amount);
+                if (transaction.type === 'income') {
+                    totalBalance += amount;
+                } else {
+                    totalBalance -= amount;
+                    monthlyBudgetUsed += amount;
+                }
+            });
+
+            totalBalanceEl.textContent = `$${totalBalance.toFixed(2)}`;
+            budgetTextEl.textContent = `$${monthlyBudgetUsed.toFixed(2)} / $${MONTHLY_BUDGET.toFixed(2)}`;
+
+            let progressPercentage = (monthlyBudgetUsed / MONTHLY_BUDGET) * 100;
+            progressPercentage = Math.min(progressPercentage, 100); // Cap at 100%
+            budgetProgressBar.style.width = `${progressPercentage}%`;
+
+            if (progressPercentage >= 80) {
+                budgetProgressBar.classList.remove('bg-rose-500');
+                budgetProgressBar.classList.add('bg-red-600');
+            } else if (progressPercentage >= 50) {
+                budgetProgressBar.classList.remove('bg-rose-500', 'bg-red-600');
+                budgetProgressBar.classList.add('bg-yellow-500');
+            } else {
+                budgetProgressBar.classList.remove('bg-yellow-500', 'bg-red-600');
+                budgetProgressBar.classList.add('bg-rose-500');
+            }
+        }
+
+        // Render transactions list
+        function renderTransactions() {
+            transactionTypeList.innerHTML = ''; // Clear existing list
+
+            // Sort transactions by ID (or timestamp if added) to maintain consistent order, then reverse for latest first
+            const sortedTransactions = [...transactions].sort((a, b) => b.id - a.id);
+
+            sortedTransactions.forEach(transaction => {
+                const isIncome = transaction.type === 'income';
+                const sign = isIncome ? '+' : '-';
+                const amountColor = isIncome ? 'text-emerald-400' : 'text-rose-400';
+                const borderColor = isIncome ? 'border-emerald-500' : 'border-rose-500';
+
+                const transactionItem = document.createElement('div');
+                transactionItem.classList.add(
+                    'flex', 'justify-between', 'items-center', 'p-4', 'bg-white/5', 'backdrop-blur-sm',
+                    'border', 'border-white/10', 'rounded-lg', 'shadow-md', 'transition-all', 'duration-200',
+                    'ease-in-out', 'hover:border-cyan-500', 'hover:shadow-cyan-500/20',
+                    'group', 'relative', 'overflow-hidden', borderColor, 'border-l-4'
+                );
+
+                transactionItem.innerHTML = `
+                    <div class="flex-grow">
+                        <p class="text-lg font-medium text-gray-200">${transaction.name}</p>
+                        <span class="text-sm text-gray-400">${new Date(transaction.date).toLocaleDateString()}</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-xl font-bold ${amountColor}">${sign}$${parseFloat(transaction.amount).toFixed(2)}</span>
+                        <button onclick="deleteTransaction(${transaction.id})"
+                                class="text-gray-400 hover:text-rose-500 transition-colors duration-200 ease-in-out p-2 rounded-full hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-rose-500">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                `;
+                transactionTypeList.appendChild(transactionItem);
+            });
+        }
+
+        // Add new transaction
+        function addTransaction(e) {
+            e.preventDefault();
+
+            const name = transactionNameInput.value.trim();
+            const amount = parseFloat(transactionAmountInput.value.trim());
+            const type = document.querySelector('input[name="transaction-type"]:checked').value;
+
+            if (!name || isNaN(amount) || amount <= 0) {
+                alert('Please enter a valid name and a positive amount.');
+                return;
+            }
+
+            const newTransaction = {
+                id: Date.now(), // Unique ID based on timestamp
+                name,
+                amount,
+                type,
+                date: new Date().toISOString()
+            };
+
+            transactions.push(newTransaction);
+            saveTransactions();
+            renderTransactions();
+            updateBalanceAndBudget();
+
+            // Clear form
+            transactionNameInput.value = '';
+            transactionAmountInput.value = '';
+            transactionTypeIncome.checked = true;
+        }
+
+        // Delete transaction
+        function deleteTransaction(id) {
+            transactions = transactions.filter(transaction => transaction.id !== id);
+            saveTransactions();
+            renderTransactions();
+            updateBalanceAndBudget();
+        }
+
+        // Initialize the app
+        function init() {
+            loadTransactions();
+            renderTransactions();
+            updateBalanceAndBudget();
+        }
+
+        // Event Listeners
+        transactionForm.addEventListener('submit', addTransaction);
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
